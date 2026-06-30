@@ -9,6 +9,7 @@ from .config import LLM_MODEL
 
 class LLM(Protocol):
     def complete_json(self, system: str, user: str) -> dict | None: ...
+    def complete(self, system: str, user: str) -> str: ...
 
 
 _FENCE_RE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
@@ -56,3 +57,13 @@ class OllamaLLM:
             if parsed is not None:
                 return parsed
         return None
+
+    def complete(self, system: str, user: str) -> str:
+        resp = self._client.chat(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+        )
+        return resp["message"]["content"]
