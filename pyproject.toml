@@ -1,0 +1,33 @@
+[project]
+name = "journal"
+version = "0.1.0"
+description = "Local analysis pipeline for Apple Journal entries"
+requires-python = ">=3.12"
+dependencies = [
+    "ollama>=0.4",
+    "lancedb>=0.17",
+    "pyarrow>=17",
+    "beautifulsoup4>=4.12",
+    "pandas>=2.2",
+    "plotly>=5.24",
+    "matplotlib>=3.9",
+    "tqdm>=4.66",
+    "python-dateutil>=2.9",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/journal"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "jupyterlab>=4",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
