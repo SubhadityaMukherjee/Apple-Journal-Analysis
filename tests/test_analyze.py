@@ -51,3 +51,29 @@ def test_sentiment_validate_rejects_unknown_level():
 
 def test_sentiment_validate_rejects_out_of_range_score():
     assert not SENTIMENT.validate({"level": "neutral", "score": 9, "confidence": 0.5})
+
+
+from journal.questions.topics import TOPICS
+from journal.questions import default_registry
+
+
+def test_topics_template_and_id():
+    assert "{text}" in TOPICS.user_template
+    assert TOPICS.id == "topics"
+
+
+def test_topics_validate_accepts_three_strings():
+    assert TOPICS.validate({"topics": ["a", "b", "c"]})
+
+
+def test_topics_validate_rejects_too_few():
+    assert not TOPICS.validate({"topics": ["a", "b"]})
+
+
+def test_topics_validate_rejects_non_string():
+    assert not TOPICS.validate({"topics": ["a", "b", 3]})
+
+
+def test_default_registry_has_both_questions():
+    reg = default_registry()
+    assert set(reg.list_ids()) == {"sentiment", "topics"}
