@@ -42,13 +42,13 @@ class Store:
         self.db = lancedb.connect(str(self.db_path))
 
     def create_tables(self) -> None:
-        if "entries" not in self.db.table_names():
+        if "entries" not in self.db.list_tables().tables:
             self.db.create_table("entries", schema=_entries_schema())
-        if "analyses" not in self.db.table_names():
+        if "analyses" not in self.db.list_tables().tables:
             self.db.create_table("analyses", schema=_analyses_schema())
 
     def table_names(self) -> list[str]:
-        return self.db.table_names()
+        return self.db.list_tables().tables
 
     def add_entries(self, rows: list[dict]) -> None:
         self.db.open_table("entries").add(rows)
