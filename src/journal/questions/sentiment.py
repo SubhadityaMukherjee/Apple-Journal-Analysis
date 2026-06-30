@@ -14,7 +14,7 @@ SYSTEM = (
 )
 
 USER_TEMPLATE = """Respond with ONLY a JSON object of the form:
-{"level": "<one of: extreme_negative, negative, neutral, positive, extreme_positive>", "score": <integer 1-5>, "confidence": <float 0.0-1.0>}
+{{"level": "<one of: extreme_negative, negative, neutral, positive, extreme_positive>", "score": <integer 1-5>, "confidence": <float 0.0-1.0>}}
 
 Scale:
 1 / extreme_negative: anguish, crisis language, overwhelming distress

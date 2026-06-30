@@ -77,3 +77,87 @@ def test_topics_validate_rejects_non_string():
 def test_default_registry_has_both_questions():
     reg = default_registry()
     assert set(reg.list_ids()) == {"sentiment", "topics"}
+
+
+from datetime import datetime
+from pathlib import Path
+
+from journal.analyze import BatchAnalyzer, AnalyzeReport
+from journal.store import Store
+from journal.questions.sentiment import SENTIMENT
+
+
+class FakeLLM:
+    def __init__(self, payload: dict):
+        self.payload = payload
+
+    def complete_json(self, system: str, user: str):
+        return dict(self.payload)
+
+
+def _seed_store(tmp_path: Path, n: int = 4) -> Store:
+    s = Store(tmp_path / "lance")
+    s.create_tables()
+    rows = [
+        {
+            "id": f"e{i}",
+            "file_path": f"/tmp/f{i}.html",
+            "date": datetime(2020, 1, 1 + i).date(),
+            "timestamp": datetime(2020, 1, 1 + i, 10, 0),
+            "time_of_day": "morning",
+            "day_of_week": "Wed",
+            "text": f"body {i}",
+            "category": None,
+            "embedding": [0.0] * 768,
+            "ingested_at": datetime(2026, 6, 30),
+        }
+        for i in range(n)
+    ]
+    s.add_entries(rows)
+    return s
+
+
+def test_batch_analyzer_runs_sentiment_over_all_entries(tmp_path: Path):
+    store = _seed_store(tmp_path, n=4)
+    llm = FakeLLM({"level": "neutral", "score": 3, "confidence": 0.7})
+    reg = QuestionRegistry()
+    reg.register(SENTIMENT)
+    analyzer = BatchAnalyzer(store=store, llm=llm, registry=reg)
+
+    report = analyzer.run(question_id="sentiment")
+
+    assert report.processed == 4
+    assert report.failed == 0
+    adf = store.analyses_to_pandas()
+    assert len(adf) == 4
+    assert all(adf["parsed_ok"])
+    assert all(adf["question_id"] == "sentiment")
+
+
+def test_batch_analyzer_skips_already_done(tmp_path: Path):
+    store = _seed_store(tmp_path, n=4)
+    llm = FakeLLM({"level": "neutral", "score": 3, "confidence": 0.7})
+    reg = QuestionRegistry()
+    reg.register(SENTIMENT)
+    analyzer = BatchAnalyzer(store=store, llm=llm, registry=reg)
+
+    analyzer.run(question_id="sentiment")
+    report2 = analyzer.run(question_id="sentiment")
+
+    assert report2.processed == 0
+    assert store.analyses_to_pandas().shape[0] == 4
+
+
+def test_batch_analyzer_counts_failures(tmp_path: Path):
+    store = _seed_store(tmp_path, n=2)
+
+    class BadLLM:
+        def complete_json(self, system, user):
+            return None
+
+    reg = QuestionRegistry()
+    reg.register(SENTIMENT)
+    analyzer = BatchAnalyzer(store=store, llm=BadLLM(), registry=reg)
+    report = analyzer.run(question_id="sentiment")
+    assert report.processed == 0
+    assert report.failed == 2

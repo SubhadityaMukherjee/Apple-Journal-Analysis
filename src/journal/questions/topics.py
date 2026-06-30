@@ -9,7 +9,7 @@ USER_TEMPLATE = """Identify the top 3 topics in this journal entry.
 Topics must be short phrases (1-3 words), lowercase, and concrete (not "life" or "feelings").
 
 Respond with ONLY a JSON object of the form:
-{"topics": ["topic_one", "topic_two", "topic_three"]}
+{{"topics": ["topic_one", "topic_two", "topic_three"]}}
 
 Journal entry:
 {text}"""
