@@ -8,7 +8,7 @@ def test_parse_file_returns_entries(sample_html_path: Path):
     entries = parse_file(sample_html_path)
     assert len(entries) > 5
     first = entries[0]
-    assert first.date.isoformat() == "2020-06-29"
+    assert first.date.isoformat() == "2020-06-30"
     assert first.timestamp == datetime(2020, 6, 30, 0, 0)
     assert "I don't even like their way of life" in first.text
     assert first.category == "Stress"

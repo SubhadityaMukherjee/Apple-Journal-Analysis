@@ -27,11 +27,6 @@ class Entry:
     category: str | None
 
 
-def _parse_filename_date(path: Path) -> date:
-    stem = path.stem.split("_")[0]
-    return datetime.strptime(stem, "%Y-%m-%d").date()
-
-
 def _parse_timestamp(line: str) -> datetime | None:
     m = TIMESTAMP_RE.match(line.strip())
     if not m:
@@ -61,7 +56,6 @@ def parse_file(path: Path) -> list[Entry]:
     soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
     for style in soup(["style", "script"]):
         style.decompose()
-    file_date = _parse_filename_date(path)
 
     raw_lines: list[str] = []
     for p in soup.find_all("p"):
@@ -81,7 +75,7 @@ def parse_file(path: Path) -> list[Entry]:
                 if body:
                     entries.append(Entry(
                         file_path=str(path),
-                        date=file_date,
+                        date=current_ts.date(),
                         timestamp=current_ts,
                         text=body,
                         category=cat,
@@ -97,7 +91,7 @@ def parse_file(path: Path) -> list[Entry]:
         if body:
             entries.append(Entry(
                 file_path=str(path),
-                date=file_date,
+                date=current_ts.date(),
                 timestamp=current_ts,
                 text=body,
                 category=cat,
