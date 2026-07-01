@@ -42,6 +42,11 @@ class AnalyzeReport:
 
 
 @dataclass
+class AnalyzeReportSet:
+    reports: list[AnalyzeReport] = field(default_factory=list)
+
+
+@dataclass
 class BatchAnalyzer:
     store: object
     llm: object
@@ -103,3 +108,8 @@ class BatchAnalyzer:
         if buffer:
             self.store.add_analyses(buffer)
         return report
+
+    def run_many(self, question_ids: list[str]) -> AnalyzeReportSet:
+        for qid in question_ids:
+            self.registry.get(qid)  # raises KeyError before any work if missing
+        return AnalyzeReportSet(reports=[self.run(qid) for qid in question_ids])

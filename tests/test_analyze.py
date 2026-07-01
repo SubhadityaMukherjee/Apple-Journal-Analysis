@@ -192,3 +192,54 @@ def test_batch_analyzer_persists_partial_progress_on_abort(tmp_path: Path):
 
     persisted = store.analyses_to_pandas()
     assert len(persisted) > 0, "partial progress should be persisted before the abort"
+
+
+def test_run_many_runs_all_questions(tmp_path: Path):
+    store = _seed_store(tmp_path, n=3)
+    reg = QuestionRegistry()
+    reg.register(_dummy_question("a"))
+    reg.register(_dummy_question("b"))
+    analyzer = BatchAnalyzer(
+        store=store, llm=FakeLLM({"x": 1}), registry=reg,
+    )
+
+    result = analyzer.run_many(["a", "b"])
+
+    assert [r.question_id for r in result.reports] == ["a", "b"]
+    assert all(r.processed == 3 for r in result.reports)
+    adf = store.analyses_to_pandas()
+    assert len(adf) == 6  # 3 entries × 2 questions
+    assert set(adf["question_id"]) == {"a", "b"}
+
+
+def test_run_many_resumes_per_question(tmp_path: Path):
+    store = _seed_store(tmp_path, n=3)
+    reg = QuestionRegistry()
+    reg.register(_dummy_question("a"))
+    reg.register(_dummy_question("b"))
+    analyzer = BatchAnalyzer(
+        store=store, llm=FakeLLM({"x": 1}), registry=reg,
+    )
+
+    analyzer.run_many(["a", "b"])
+    result2 = analyzer.run_many(["a", "b"])
+
+    assert len(result2.reports) == 2
+    assert all(r.processed == 0 for r in result2.reports)
+    # store content unchanged: still exactly one row per (entry, question)
+    assert store.analyses_to_pandas().shape[0] == 6
+
+
+def test_run_many_rejects_unknown_id_before_any_work(tmp_path: Path):
+    store = _seed_store(tmp_path, n=3)
+    reg = QuestionRegistry()
+    reg.register(_dummy_question("a"))
+    analyzer = BatchAnalyzer(
+        store=store, llm=FakeLLM({"x": 1}), registry=reg,
+    )
+
+    with pytest.raises(KeyError):
+        analyzer.run_many(["a", "bogus"])
+
+    # validation happens up front, so even question "a" never writes anything
+    assert len(store.analyses_to_pandas()) == 0
