@@ -32,3 +32,15 @@ def test_parse_file_strips_html(sample_html_path: Path):
     for e in entries:
         assert "<" not in e.text
         assert "Cocoa HTML Writer" not in e.text
+
+
+def test_parse_file_handles_new_format_no_timestamps():
+    """Post-2024 Apple Journal exports have no per-entry timestamps.
+    The parser should fall back to the page header date and treat the body as one entry."""
+    path = Path(__file__).parent / "fixtures" / "2025-07-07.html"
+    entries = parse_file(path)
+    assert len(entries) == 1
+    e = entries[0]
+    assert e.date.isoformat() == "2025-07-08"  # header says "Tuesday, 8 July 2025"
+    assert e.timestamp == datetime(2025, 7, 8, 0, 0)  # midnight fallback
+    assert "new phone" in e.text.lower()

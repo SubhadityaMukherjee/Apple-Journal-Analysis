@@ -13,6 +13,7 @@ dependencies = [
     "matplotlib>=3.9",
     "tqdm>=4.66",
     "python-dateutil>=2.9",
+    "pylance>=7.0.0",
 ]
 
 [build-system]
@@ -26,6 +27,7 @@ packages = ["src/journal"]
 dev = [
     "pytest>=8",
     "jupyterlab>=4",
+    "nbformat>=5.10",
 ]
 
 [tool.pytest.ini_options]

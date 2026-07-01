@@ -11,6 +11,13 @@ TIMESTAMP_RE = re.compile(
     r"(\d{1,2}),\s+(\d{4})\s+-\s+(\d{1,2}):(\d{2})\s+(AM|PM)$"
 )
 
+HEADER_DATE_RE = re.compile(
+    r"^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+"
+    r"(\d{1,2})\s+"
+    r"(January|February|March|April|May|June|July|August|September|October|November|December)\s+"
+    r"(\d{4})$"
+)
+
 KNOWN_CATEGORIES = {
     "Gratitude", "Stress", "Notes", "Joy", "Sadness", "Anger",
     "Fear", "Pride", "Hope", "Love", "Calm", "Excitement",
@@ -39,6 +46,15 @@ def _parse_timestamp(line: str) -> datetime | None:
     return datetime(int(year), month_num, int(day), hour, int(minute))
 
 
+def _parse_header_date(line: str) -> date | None:
+    m = HEADER_DATE_RE.match(line.strip())
+    if not m:
+        return None
+    _, day, month_name, year = m.groups()
+    month_num = datetime.strptime(month_name, "%B").month
+    return date(int(year), month_num, int(day))
+
+
 def _extract_category(text: str) -> tuple[str, str | None]:
     lines = [l.strip() for l in text.strip().splitlines() if l.strip()]
     if not lines:
@@ -57,6 +73,7 @@ def parse_file(path: Path) -> list[Entry]:
     for style in soup(["style", "script"]):
         style.decompose()
 
+    page_header_date: date | None = None
     raw_lines: list[str] = []
     for p in soup.find_all("p"):
         text = p.get_text(separator=" ").strip()
@@ -82,9 +99,13 @@ def parse_file(path: Path) -> list[Entry]:
                     ))
             current_ts = ts
             current_buf = []
-        else:
-            if current_ts is not None:
-                current_buf.append(line)
+            continue
+        hd = _parse_header_date(line)
+        if hd is not None:
+            if page_header_date is None:
+                page_header_date = hd
+            continue
+        current_buf.append(line)
 
     if current_ts is not None and current_buf:
         body, cat = _extract_category("\n".join(current_buf))
@@ -93,6 +114,18 @@ def parse_file(path: Path) -> list[Entry]:
                 file_path=str(path),
                 date=current_ts.date(),
                 timestamp=current_ts,
+                text=body,
+                category=cat,
+            ))
+
+    if not entries and page_header_date is not None and current_buf:
+        body, cat = _extract_category("\n".join(current_buf))
+        if body:
+            fallback_ts = datetime.combine(page_header_date, datetime.min.time())
+            entries.append(Entry(
+                file_path=str(path),
+                date=page_header_date,
+                timestamp=fallback_ts,
                 text=body,
                 category=cat,
             ))
