@@ -161,3 +161,34 @@ def test_batch_analyzer_counts_failures(tmp_path: Path):
     report = analyzer.run(question_id="sentiment")
     assert report.processed == 0
     assert report.failed == 2
+
+
+def test_batch_analyzer_persists_partial_progress_on_abort(tmp_path: Path):
+    """If a run aborts mid-way (kernel interrupt or a raised exception), entries
+    processed before the abort must already be persisted so the next run resumes
+    from there instead of redoing them. Regression for the 'not keeping state' bug
+    where add_analyses was called once at the very end of run()."""
+    store = _seed_store(tmp_path, n=6)
+
+    class FlakyLLM:
+        def __init__(self):
+            self.n = 0
+
+        def complete_json(self, system, user):
+            self.n += 1
+            if self.n == 5:
+                raise RuntimeError("ollama exploded")
+            return {"level": "neutral", "score": 3, "confidence": 0.7}
+
+    reg = QuestionRegistry()
+    reg.register(SENTIMENT)
+    analyzer = BatchAnalyzer(
+        store=store, llm=FlakyLLM(), registry=reg,
+        max_workers=1, flush_every=2,
+    )
+
+    with pytest.raises(RuntimeError):
+        analyzer.run(question_id="sentiment")
+
+    persisted = store.analyses_to_pandas()
+    assert len(persisted) > 0, "partial progress should be persisted before the abort"

@@ -30,6 +30,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
+from tqdm import tqdm
+
 
 @dataclass
 class AnalyzeReport:
@@ -46,6 +48,7 @@ class BatchAnalyzer:
     registry: QuestionRegistry
     model: str = "gemma3:4b"
     max_workers: int = 4
+    flush_every: int = 20
 
     def run(self, question_id: str) -> AnalyzeReport:
         question = self.registry.get(question_id)
@@ -55,7 +58,7 @@ class BatchAnalyzer:
             return report
 
         df = self.store.entries_to_pandas().set_index("id")
-        rows_to_write: list[dict] = []
+        buffer: list[dict] = []
 
         def _one(entry_id: str) -> dict:
             text = df.loc[entry_id, "text"]
@@ -82,13 +85,21 @@ class BatchAnalyzer:
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
             futures = {pool.submit(_one, eid): eid for eid in pending_ids}
-            for fut in as_completed(futures):
+            for fut in tqdm(
+                as_completed(futures),
+                total=len(futures),
+                desc=f"analyze[{question_id}]",
+            ):
                 row = fut.result()
-                rows_to_write.append(row)
+                buffer.append(row)
                 if row["parsed_ok"]:
                     report.processed += 1
                 else:
                     report.failed += 1
+                if len(buffer) >= self.flush_every:
+                    self.store.add_analyses(buffer)
+                    buffer = []
 
-        self.store.add_analyses(rows_to_write)
+        if buffer:
+            self.store.add_analyses(buffer)
         return report
